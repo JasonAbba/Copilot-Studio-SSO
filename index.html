@@ -138,6 +138,7 @@
             user = accounts[0]
             msalInstance.setActiveAccount(user);
             document.getElementById("loginStatus").innerHTML = "Currently logged in as " + user.name + " on the website."
+            alert("Login Successfull.");
 
             // Hide login button and show logout button
             document.getElementById("login").style.display = "none"
@@ -225,6 +226,8 @@
 
             const { token } = await fetchJSON(tokenEndpoint);
             const directLine = window.WebChat.createDirectLine({ token });
+            console.table(token);
+            console.table(directLine);
 
             const store = WebChat.createStore(
                 {},
