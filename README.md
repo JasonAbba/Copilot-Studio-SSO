@@ -1,6 +1,6 @@
 # Copilot-Studio-SSO
 
-Custom web canvas for Microsoft Copilot Studio with seamless SSO via MSAL.js. Authenticates users via Microsoft Entra ID to enable secure, personalized conversations and Dataverse integration without repetitive login prompts. Optimized for secure, identity-aware sales agent deployments.
+Custom web canvas for Microsoft Copilot Studio with seamless SSO via MSAL.js. Authenticates users via Microsoft Entra ID to enable secure, personalized conversations and Dataverse integration without repetitive login prompts. Optimized for secure, identity-aware sales agent deployments. [Parent Repo](https://github.com/microsoft/CopilotStudioSamples/tree/main/SSOSamples/SSOwithEntraID)
 
 ## 🚀 Overview
 This project provides a production-ready boilerplate for hosting a Copilot Studio agent on a custom website (such as GitHub Pages). It solves the "double login" problem by using a Token Exchange flow—once the user logs into your website, the agent automatically recognizes them.
