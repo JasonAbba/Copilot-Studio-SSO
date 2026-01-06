@@ -85,7 +85,7 @@
         // See documentation (https://learn.microsoft.com/en-us/microsoft-copilot-studio/configure-sso?tabs=webApp)
         const clientId = "5b15bbc3-38e3-4fcc-8d8c-adb020a14615" //"YOUR_CLIENT_ID"
         const tenantId = "24917450-fe15-4414-92ed-94fa8ec1b938" //"YOUR_TENANT_ID"
-        const tokenEndpoint = "https://15f7ece55636e98d9c5cc2f68ef371.97.environment.api.powerplatform.com/copilotstudio/dataverse-backed/authenticated/bots/cr6c4_sysforeAgent/conversations?api-version=2022-03-01-preview" //"YOUR_TOKEN_ENDPOINT" 
+        const tokenEndpoint = "https://15f7ece55636e98d9c5cc2f68ef371.97.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr6c4_sysforeAgent/directline/token?api-version=2022-03-01-preview" //"YOUR_TOKEN_ENDPOINT" 
         console.table("tokenEndpoint", tokenEndpoint)
         // Config object to be passed to Msal on creation
         const msalConfig = {
@@ -197,24 +197,24 @@
             return null
         }
 
-        // /**
-        //  * Helper function to fetch a JSON API
-        //  */
-        // async function fetchJSON(url, options = {}) {
-        //     const res = await fetch(url, {
-        //         ...options,
-        //         headers: {
-        //             ...options.headers,
-        //             accept: 'application/json'
-        //         }
-        //     });
+        /**
+         * Helper function to fetch a JSON API
+         */
+        async function fetchJSON(url, options = {}) {
+            const res = await fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    accept: 'application/json'
+                }
+            });
 
-        //     if (!res.ok) {
-        //         throw new Error(`Failed to fetch JSON due to ${res.status}`);
-        //     }
+            if (!res.ok) {
+                throw new Error(`Failed to fetch JSON due to ${res.status}`);
+            }
 
-        //     return await res.json();
-        // } 
+            return await res.json();
+        } 
     </script>
 
     <script>
@@ -224,7 +224,7 @@
                 (user.localAccountId).substr(0, 36) :
                 (Math.random().toString() + Date.now().toString()).substr(0, 64);
 
-            const { token } = "8fghuEyn2YGFk09fhL3o1a4Idlh4Gm3PxEvy7797sugLVqSC4ICjJQQJ99BLAC5T7U2AArohAAABAZBS2tBp.5TOxnpx8nlzdKoHcypJlFAKM7zigJgBSxt7Th5SVmBikHwasdNzpJQQJ99BLAC5T7U2AArohAAABAZBS2xhW" //await fetchJSON(tokenEndpoint);
+            const { token } = await fetchJSON(tokenEndpoint);
             const directLine = window.WebChat.createDirectLine({ token });
             console.table(token);
             console.table(directLine);
