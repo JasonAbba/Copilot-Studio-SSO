@@ -224,7 +224,7 @@
                 (user.localAccountId).substr(0, 36) :
                 (Math.random().toString() + Date.now().toString()).substr(0, 64);
 
-            const { token } = await fetchJSON(tokenEndpoint);
+            const { token } = "8fghuEyn2YGFk09fhL3o1a4Idlh4Gm3PxEvy7797sugLVqSC4ICjJQQJ99BLAC5T7U2AArohAAABAZBS2tBp.5TOxnpx8nlzdKoHcypJlFAKM7zigJgBSxt7Th5SVmBikHwasdNzpJQQJ99BLAC5T7U2AArohAAABAZBS2xhW" //await fetchJSON(tokenEndpoint);
             const directLine = window.WebChat.createDirectLine({ token });
             console.table(token);
             console.table(directLine);
