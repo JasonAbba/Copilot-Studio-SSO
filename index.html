@@ -81,54 +81,64 @@
             const { token } = await dlRes.json();
             console.log("✅ Bot Token acquired.");
 
-            // 4. SSO Interceptor Store
-            // SSO Interceptor Store
-const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
-    if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
-        const activity = action.payload.activity;
-
-        // Check if this is an OAuth Card
-        if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
-            console.group("🔐 SSO Debugger");
-            
-            const content = activity.attachments[0].content;
-            const sasUrl = content?.tokenPostResource?.sasUrl;
-
-            console.log("Full Activity Object:", activity);
-            console.log("Token Post Resource:", content?.tokenPostResource);
-            console.log("SAS URL:", sasUrl);
-
-            if (!sasUrl) {
-                console.error("❌ ERROR: sasUrl is missing from the Bot's OAuth card.");
-                console.info("Fix: Check Copilot Studio 'Manual' auth settings and ensure the App ID matches.");
-                console.groupEnd();
-                return next(action); // Let the card show so we can see it in the UI
-            }
-
-            try {
-                const tokenResult = await msalInstance.acquireTokenSilent({
-                    scopes: [config.bot.scope],
-                    account: user
-                });
+            // 4. SSO Interceptor & Proactive Trigger Store
+            const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
                 
-                console.log("✅ MSAL Token Acquired:", tokenResult.accessToken.substring(0, 10) + "...");
-
-                const postRes = await fetch(sasUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: tokenResult.accessToken })
-                });
-
-                console.log("POST Response Status:", postRes.status);
-            } catch (err) {
-                console.error("❌ Token Exchange Failed:", err);
-            }
-            console.groupEnd();
-            return; 
-        }
-    }
-    return next(action);
-});
+                // --- PART A: PROACTIVE START CONVERSATION ---
+                if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
+                    console.log("📡 Direct Line connected. Triggering 'startConversation'...");
+                    dispatch({
+                        type: 'DIRECT_LINE/POST_ACTIVITY',
+                        payload: {
+                            activity: {
+                                type: 'event',
+                                name: 'startConversation', // This triggers the System Greeting topic in Copilot Studio
+                                value: {}
+                            }
+                        }
+                    });
+                }
+            
+                // --- PART B: SILENT SSO INTERCEPTOR ---
+                if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
+                    const activity = action.payload.activity;
+            
+                    if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
+                        console.group("🔐 SSO Debugger");
+                        
+                        const content = activity.attachments[0].content;
+                        const sasUrl = content?.tokenPostResource?.sasUrl;
+            
+                        if (!sasUrl) {
+                            console.error("❌ ERROR: sasUrl is missing.");
+                            console.groupEnd();
+                            return next(action);
+                        }
+            
+                        try {
+                            const tokenResult = await msalInstance.acquireTokenSilent({
+                                scopes: [config.bot.scope],
+                                account: msalInstance.getAllAccounts()[0]
+                            });
+                            
+                            console.log("✅ MSAL Token Acquired.");
+            
+                            await fetch(sasUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ token: tokenResult.accessToken })
+                            });
+            
+                            console.log("✅ Token POST successful.");
+                        } catch (err) {
+                            console.error("❌ Token Exchange Failed:", err);
+                        }
+                        console.groupEnd();
+                        return; // Swallows the login card
+                    }
+                }
+                return next(action);
+            });
 
             // 5. Render WebChat
             window.WebChat.renderWebChat({
