@@ -83,62 +83,61 @@
 
             // 4. SSO Interceptor & Proactive Trigger Store
             const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
-                
-                // --- PART A: PROACTIVE START CONVERSATION ---
-                if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
-                    console.log("📡 Direct Line connected. Triggering 'startConversation'...");
-                    dispatch({
-                        type: 'DIRECT_LINE/POST_ACTIVITY',
-                        payload: {
-                            activity: {
-                                type: 'event',
-                                name: 'startConversation', // This triggers the System Greeting topic in Copilot Studio
-                                value: {}
-                            }
+    
+            // 1. SAFETY GUARD: Check if action and payload exist before processing
+            if (!action) return next(action);
+        
+            // 2. PROACTIVE GREETING
+            if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
+                console.log("📡 Connected. Sending greeting...");
+                dispatch({
+                    type: 'DIRECT_LINE/POST_ACTIVITY',
+                    payload: {
+                        activity: {
+                            type: 'event',
+                            name: 'startConversation',
+                            value: {}
                         }
-                    });
-                }
-            
-                // --- PART B: SILENT SSO INTERCEPTOR ---
-                if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
-                    const activity = action.payload.activity;
-            
-                    if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
-                        console.group("🔐 SSO Debugger");
-                        
-                        const content = activity.attachments[0].content;
-                        const sasUrl = content?.tokenPostResource?.sasUrl;
-            
-                        if (!sasUrl) {
-                            console.error("❌ ERROR: sasUrl is missing.");
-                            console.groupEnd();
-                            return next(action);
-                        }
-            
+                    }
+                });
+            }
+        
+            // 3. SSO INTERCEPTOR
+            if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY' && action.payload && action.payload.activity) {
+                const activity = action.payload.activity;
+        
+                if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
+                    const content = activity.attachments[0].content;
+                    
+                    // Use Optional Chaining (?.) to prevent "Cannot read properties of undefined"
+                    const sasUrl = content?.tokenPostResource?.sasUrl;
+        
+                    if (sasUrl) {
                         try {
-                            const tokenResult = await msalInstance.acquireTokenSilent({
-                                scopes: [config.bot.scope],
-                                account: msalInstance.getAllAccounts()[0]
-                            });
-                            
-                            console.log("✅ MSAL Token Acquired.");
-            
-                            await fetch(sasUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ token: tokenResult.accessToken })
-                            });
-            
-                            console.log("✅ Token POST successful.");
+                            const accounts = msalInstance.getAllAccounts();
+                            if (accounts.length > 0) {
+                                const tokenResult = await msalInstance.acquireTokenSilent({
+                                    scopes: [config.bot.scope],
+                                    account: accounts[0]
+                                });
+        
+                                await fetch(sasUrl, {
+                                    method: 'POST', // This is likely where your error was originating
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ token: tokenResult.accessToken })
+                                });
+                                console.log("✅ SSO Token Posted.");
+                                return; // Successfully handled, don't show card
+                            }
                         } catch (err) {
-                            console.error("❌ Token Exchange Failed:", err);
+                            console.error("SSO Token Exchange Error:", err);
                         }
-                        console.groupEnd();
-                        return; // Swallows the login card
                     }
                 }
-                return next(action);
-            });
+            }
+        
+            return next(action);
+        });
 
             // 5. Render WebChat
             window.WebChat.renderWebChat({
