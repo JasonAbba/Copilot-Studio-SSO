@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enterprise Chat - GitHub Pages</title>
+    <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
+    <script src="https://cdn.botframework.com/botframework-webchat/latest/webchat.js"></script>
+    <style>
+        html, body { height: 100%; margin: 0; font-family: 'Segoe UI', sans-serif; }
+        #header { 
+            height: 60px; background: #0078d4; color: white; 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+        }
+        #webchat { height: calc(100% - 60px); width: 100%; background: #f4f4f4; }
+        .btn-logout { 
+            background: #d83b01; color: white; border: none; padding: 8px 15px; 
+            cursor: pointer; border-radius: 4px; font-weight: 600;
+        }
+        .btn-logout:hover { background: #a82a00; }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <span id="user-info">Authenticating...</span>
+        <button id="btn-signout" class="btn-logout" style="display:none;" onclick="signOut()">Sign Out</button>
+    </div>
+    <div id="webchat" role="main"></div>
+
+    <script>
+        const config = {
+            msal: {
+                auth: {
+                    clientId: "YOUR_CANVAS_APP_CLIENT_ID",
+                    authority: "https://login.microsoftonline.com/YOUR_TENANT_ID",
+                    redirectUri: "https://[username].github.io/[repo-name]/",
+                    postLogoutRedirectUri: "https://[username].github.io/[repo-name]/"
+                },
+                cache: { cacheLocation: "sessionStorage" }
+            },
+            bot: {
+                scope: "api://YOUR_AGENT_AUTH_APP_ID/access_as_user",
+                tokenEndpoint: "YOUR_COPILOT_STUDIO_TOKEN_ENDPOINT"
+            }
+        };
+
+        const msalInstance = new msal.PublicClientApplication(config.msal);
+
+        async function init() {
+            try {
+                // Handle the redirect after login or logout
+                await msalInstance.handleRedirectPromise();
+                
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length === 0) {
+                    msalInstance.loginRedirect({ scopes: ["User.Read", config.bot.scope] });
+                    return;
+                }
+
+                const user = accounts[0];
+                document.getElementById('user-info').innerText = `Logged in: ${user.name}`;
+                document.getElementById('btn-signout').style.display = 'block';
+
+                // Fetch Bot Token
+                const dlRes = await fetch(config.bot.tokenEndpoint);
+                const { token } = await dlRes.json();
+
+                // SSO Interceptor Store
+                const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
+                    if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
+                        const activity = action.payload.activity;
+                        if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
+                            const tokenResult = await msalInstance.acquireTokenSilent({
+                                scopes: [config.bot.scope],
+                                account: user
+                            });
+                            await fetch(activity.attachments[0].content.tokenPostResource.sasUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ token: tokenResult.accessToken })
+                            });
+                            return; // Stop login card
+                        }
+                    }
+                    return next(action);
+                });
+
+                window.WebChat.renderWebChat({
+                    directLine: window.WebChat.createDirectLine({ token }),
+                    store: store,
+                    userID: user.localAccountId
+                }, document.getElementById('webchat'));
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function signOut() {
+            const logoutRequest = {
+                account: msalInstance.getAccountByHomeId(msalInstance.getAllAccounts()[0].homeAccountId),
+                postLogoutRedirectUri: config.msal.auth.postLogoutRedirectUri,
+            };
+            msalInstance.logoutRedirect(logoutRequest);
+        }
+
+        init();
+    </script>
+</body>
+</html>
