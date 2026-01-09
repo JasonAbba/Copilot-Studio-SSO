@@ -2,46 +2,96 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Enterprise Chat - V0.1</title>
+    <title>Enterprise Chat - Modern UI</title>
     <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
     <script src="https://cdn.botframework.com/botframework-webchat/latest/webchat.js"></script>
     <style>
-        html, body { height: 100%; margin: 0; font-family: 'Segoe UI', sans-serif; }
+        html, body { height: 100%; margin: 0; font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; }
+        
+        /* Main Container for the Chat Widget */
+        #chat-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Modern Header */
         #header { 
-            height: 60px; background: #0078d4; color: white; 
-            display: flex; align-items: center; justify-content: space-between; 
-            padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+            height: 64px; 
+            background: linear-gradient(90deg, #0078d4 0%, #005a9e 100%); 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 24px; 
+            font-weight: 600;
+            font-size: 18px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
         }
-        #webchat { height: calc(100% - 60px); width: 100%; background: #f4f4f4; }
+
+        #webchat { 
+            flex: 1; 
+            overflow: hidden; 
+            position: relative; 
+        }
+
+        /* Logout Button Styling */
         .btn-logout { 
-            background: #d83b01; color: white; border: none; padding: 8px 15px; 
-            cursor: pointer; border-radius: 4px; font-weight: 600;
+            background: rgba(255, 255, 255, 0.2); 
+            color: white; 
+            border: 1px solid rgba(255, 255, 255, 0.4); 
+            padding: 8px 16px; 
+            cursor: pointer; 
+            border-radius: 20px; 
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s ease;
         }
-        .btn-logout:hover { background: #a82a00; }
+        .btn-logout:hover { 
+            background: rgba(255, 255, 255, 0.3); 
+        }
+
+        /* Loading Overlay */
+        #loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #666;
+        }
     </style>
 </head>
 <body>
 
-    <div id="header">
-        <span id="user-info">Authenticating...</span>
-        <button id="btn-signout" class="btn-logout" style="display:none;" onclick="signOut()">Sign Out</button>
+    <div id="chat-container">
+        <div id="header">
+            <span id="user-info">Authenticating...</span>
+            <button id="btn-signout" class="btn-logout" style="display:none;" onclick="signOut()">Sign Out</button>
+        </div>
+        <div id="webchat" role="main">
+            <div id="loader">Loading Copilot...</div>
+        </div>
     </div>
-    <div id="webchat" role="main"></div>
 
     <script>
-    // --- CONFIGURATION (Pre-filled from your uploaded file) ---
+    // --- CONFIGURATION ---
     const config = {
         msal: {
             auth: {
-                clientId: "be17ba3a-270e-4169-a3d6-a0787579b080", // Canvas App ID
-                authority: "https://login.microsoftonline.com/24917450-fe15-4414-92ed-94fa8ec1b938", // Tenant ID
+                clientId: "be17ba3a-270e-4169-a3d6-a0787579b080",
+                authority: "https://login.microsoftonline.com/24917450-fe15-4414-92ed-94fa8ec1b938",
                 redirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/",
                 postLogoutRedirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/"
             },
             cache: { cacheLocation: "sessionStorage" }
         },
         bot: {
-            scope: "api://8f264357-07e8-4604-8bcf-aba89e3efb6c/access_as_user", // Auth App ID
+            scope: "api://8f264357-07e8-4604-8bcf-aba89e3efb6c/access_as_user",
             tokenEndpoint: "https://15f7ece55636e98d9c5cc2f68ef371.97.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr6c4_sysforeAgent/directline/token?api-version=2022-03-01-preview"
         }
     };
@@ -49,118 +99,115 @@
     const msalInstance = new msal.PublicClientApplication(config.msal);
 
     async function init() {
-        console.log("🚀 Initializing MSAL and WebChat...");
+        console.log("🚀 Initializing...");
         
         try {
-            // 1. Handle Redirect (if returning from Azure Login)
             await msalInstance.handleRedirectPromise();
-            
-            // 2. Check for Active Session
             const accounts = msalInstance.getAllAccounts();
+            
             if (accounts.length === 0) {
-                console.warn("⚠️ No active session found. Redirecting to Login...");
                 msalInstance.loginRedirect({ scopes: ["User.Read", config.bot.scope] });
                 return;
             }
 
             const user = accounts[0];
-            document.getElementById('user-info').innerText = `Logged in: ${user.name}`;
+            document.getElementById('user-info').innerText = `Hello, ${user.name}`;
             document.getElementById('btn-signout').style.display = 'block';
 
-            // 3. Fetch Direct Line Token
+            // Fetch Token
             const dlRes = await fetch(config.bot.tokenEndpoint);
             const { token } = await dlRes.json();
             
-            // Create DirectLine Object
+            // Remove Loader
+            const loader = document.getElementById('loader');
+            if(loader) loader.remove();
+
             const directLine = window.WebChat.createDirectLine({ token });
 
-            // 4. SSO Store Middleware (The Core Logic)
-            const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
+            // --- AESTHETIC STYLE OPTIONS ---
+            const styleOptions = {
+                // Backgrounds
+                backgroundColor: '#F3F2F1', // Light grey chat background
+                bubbleBackground: '#FFFFFF', // White bot bubbles
+                bubbleFromUserBackground: '#0078D4', // User blue bubbles
                 
-                // --- A. PROACTIVE GREETING ---
+                // Text Colors
+                bubbleTextColor: '#000000',
+                bubbleFromUserTextColor: '#FFFFFF',
+
+                // Border Radius (Rounded corners)
+                bubbleBorderRadius: 18,
+                bubbleFromUserBorderRadius: 18,
+                
+                // Avatars
+                botAvatarInitials: 'CS', // Copilot Studio
+                userAvatarInitials: 'ME', 
+                botAvatarBackgroundColor: '#0078D4',
+                userAvatarBackgroundColor: '#201F1E',
+                
+                // Spacing & sizing
+                bubbleFromUserNuance: 'top', // Stacks user messages nicely
+                bubbleNuance: 'top',
+                paddingRegular: 10,
+
+                // Send Box Styling
+                hideUploadButton: true,
+                sendBoxBackground: '#FFFFFF',
+                sendBoxButtonColor: '#0078D4',
+                sendBoxBorderTop: '1px solid #E5E5E5',
+                sendBoxHeight: 50
+            };
+
+            const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
+                // 1. Proactive Greeting
                 if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
-                    console.log("📡 Connected. Sending 'startConversation' event...");
                     dispatch({
                         type: 'DIRECT_LINE/POST_ACTIVITY',
-                        meta: {
-                            method: 'keyboard' // <--- FIXES THE CRASH ERROR
-                        },
+                        meta: { method: 'keyboard' },
                         payload: {
-                            activity: {
-                                type: 'event',
-                                name: 'startConversation',
-                                value: {}
-                            }
+                            activity: { type: 'event', name: 'startConversation', value: {} }
                         }
                     });
                 }
 
-                // --- B. SILENT SSO HANDLING ---
+                // 2. SSO Logic
                 if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
                     const activity = action.payload.activity;
-
-                    // Detect the OAuth Card (The "Sign-in" Prompt)
                     if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
-                        console.group("🔐 SSO Card Detected");
                         const content = activity.attachments[0].content;
-                        
-                        // We look for 'tokenExchangeResource' (Standard for Copilot Studio)
-                        const tokenExchangeResource = content.tokenExchangeResource;
-                        
-                        if (tokenExchangeResource) {
-                            console.log("Found Token Exchange Resource. Attempting Silent Invoke...");
+                        if (content.tokenExchangeResource) {
                             try {
-                                // 1. Get Token Silently from MSAL
                                 const tokenResult = await msalInstance.acquireTokenSilent({
                                     scopes: [config.bot.scope],
                                     account: user
                                 });
-
-                                // 2. Send the Token to the Bot using 'invoke'
                                 directLine.postActivity({
                                     type: 'invoke',
                                     name: 'signin/tokenExchange',
                                     value: {
-                                        id: tokenExchangeResource.id,
+                                        id: content.tokenExchangeResource.id,
                                         connectionName: content.connectionName,
                                         token: tokenResult.accessToken
                                     },
-                                    from: {
-                                        id: user.localAccountId,
-                                        name: user.name,
-                                        role: "user"
-                                    }
-                                }).subscribe(
-                                    id => console.log("✅ SSO Invoke Sent. ID:", id),
-                                    err => console.error("❌ SSO Invoke Failed:", err)
-                                );
-
-                                console.groupEnd();
-                                return; // <--- CRITICAL: Stops the card from being shown to the user
-                            } catch (err) {
-                                console.error("Token Acquisition Failed", err);
-                            }
-                        } else {
-                            console.warn("⚠️ No tokenExchangeResource found. Cannot perform SSO.");
+                                    from: { id: user.localAccountId, name: user.name, role: "user" }
+                                }).subscribe();
+                                return; // Hide card
+                            } catch (e) { console.error(e); }
                         }
-                        console.groupEnd();
                     }
                 }
                 return next(action);
             });
 
-            // 5. Render WebChat
             window.WebChat.renderWebChat({
                 directLine: directLine,
                 store: store,
                 userID: user.localAccountId,
-                styleOptions: {
-                    hideUploadButton: true
-                }
+                styleOptions: styleOptions
             }, document.getElementById('webchat'));
             
         } catch (err) {
-            console.error("Critical Error:", err);
+            console.error("Error:", err);
         }
     }
 
