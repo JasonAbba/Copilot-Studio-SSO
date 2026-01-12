@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Enterprise Chat - Modern UI</title>
+    <script src="https://cdn.botframework.com/botframework-webchat/4.18.0/webchat.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
-    <script src="https://cdn.botframework.com/botframework-webchat/latest/webchat.js"></script>
     <style>
         html, body { height: 100%; margin: 0; font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; }
         
-        /* Main Container for the Chat Widget */
         #chat-container {
             height: 100%;
             display: flex;
@@ -19,7 +18,6 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        /* Modern Header */
         #header { 
             height: 64px; 
             background: linear-gradient(90deg, #0078d4 0%, #005a9e 100%); 
@@ -40,7 +38,6 @@
             position: relative; 
         }
 
-        /* Logout Button Styling */
         .btn-logout { 
             background: rgba(255, 255, 255, 0.2); 
             color: white; 
@@ -56,7 +53,6 @@
             background: rgba(255, 255, 255, 0.3); 
         }
 
-        /* Loading Overlay */
         #loader {
             display: flex;
             justify-content: center;
@@ -79,11 +75,10 @@
     </div>
 
     <script>
-    // --- CONFIGURATION ---
     const config = {
         msal: {
             auth: {
-                clientId: "be17ba3a-270e-4169-a3d6-a0787579b080", //Copilot-Canvas-App Client ID
+                clientId: "be17ba3a-270e-4169-a3d6-a0787579b080", 
                 authority: "https://login.microsoftonline.com/24917450-fe15-4414-92ed-94fa8ec1b938",
                 redirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/", 
                 postLogoutRedirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/" 
@@ -91,7 +86,7 @@
             cache: { cacheLocation: "sessionStorage" }
         },
         bot: {
-            scope: "api://8f264357-07e8-4604-8bcf-aba89e3efb6c/access_as_user", //Scope from Copilot-Auth-App 
+            scope: "api://8f264357-07e8-4604-8bcf-aba89e3efb6c/access_as_user", 
             tokenEndpoint: "https://15f7ece55636e98d9c5cc2f68ef371.97.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr6c4_sysforeAgent/directline/token?api-version=2022-03-01-preview"
         }
     };
@@ -105,7 +100,6 @@
             await msalInstance.handleRedirectPromise();
             const accounts = msalInstance.getAllAccounts();
 
-            // Check if there is a valid login available in browser
             if (accounts.length === 0) {
                 msalInstance.loginRedirect({ scopes: ["User.Read", config.bot.scope] });
                 return;
@@ -115,40 +109,37 @@
             document.getElementById('user-info').innerText = `Hello, ${user.name}`;
             document.getElementById('btn-signout').style.display = 'block';
 
-            //Generate Initials
             const userInitials = user.name ? user.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() : 'ME'; 
 
-            // Fetch Token
             const dlRes = await fetch(config.bot.tokenEndpoint);
             const { token } = await dlRes.json();
             
-            // Remove Loader
             const loader = document.getElementById('loader');
             if(loader) loader.remove();
 
             const directLine = window.WebChat.createDirectLine({ token });
 
-            // --- AESTHETIC STYLE OPTIONS ---
+            // 2. SAFETY CHECK: Define React explicitly
+            const React = window.WebChat.React;
+            if (!React) {
+                console.error("⚠️ WebChat.React is undefined. The accordion debugger will not appear.");
+            }
+
             const styleOptions = {
                 backgroundColor: '#F3F2F1', 
                 bubbleBackground: '#FFFFFF', 
                 bubbleFromUserBackground: '#0078D4', 
-                
                 bubbleTextColor: '#000000',
                 bubbleFromUserTextColor: '#FFFFFF',
-
                 bubbleBorderRadius: 18,
                 bubbleFromUserBorderRadius: 18,
-                
                 botAvatarInitials: 'CS', 
                 userAvatarInitials: userInitials, 
                 botAvatarBackgroundColor: '#0078D4',
                 userAvatarBackgroundColor: '#201F1E',
-                
                 bubbleFromUserNuance: 'top', 
                 bubbleNuance: 'top',
                 paddingRegular: 10,
-
                 hideUploadButton: true,
                 sendBoxBackground: '#FFFFFF',
                 sendBoxButtonColor: '#0078D4',
@@ -157,18 +148,14 @@
             };
 
             const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
-                // 1. Proactive Greeting
                 if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
                     dispatch({
                         type: 'DIRECT_LINE/POST_ACTIVITY',
                         meta: { method: 'keyboard' },
-                        payload: {
-                            activity: { type: 'event', name: 'startConversation', value: {} }
-                        }
+                        payload: { activity: { type: 'event', name: 'startConversation', value: {} } }
                     });
                 }
 
-                // 2. SSO Logic
                 if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
                     const activity = action.payload.activity;
                     if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
@@ -189,18 +176,11 @@
                                     },
                                     from: { id: user.localAccountId, name: user.name, role: "user" }
                                 }).subscribe();
-                                return; // Hide card
+                                return; 
                             } catch (e) { console.error(e); }
                         }
                     }
                 }
-
-                // Console log activity
-                if (action.payload?.activity) {
-                    console.log("🚨 Activity Logged:");
-                    console.log(JSON.stringify(action.payload.activity, null, 2));
-                }
-                
                 return next(action);
             });
 
@@ -210,36 +190,25 @@
                 userID: user.localAccountId,
                 styleOptions: styleOptions,
 
-                // --- NEW MIDDLEWARE FOR DEBUG ACCORDION ---
+                // --- 3. SAFER DEBUG MIDDLEWARE ---
                 activityMiddleware: () => next => card => children => {
                     const originalBubble = next(card)(children);
-                    const React = window.WebChat.React;
 
-                    // Only add debug info to messages, not system events
-                    if (card.activity.type !== 'message') {
+                    // If React is missing or this isn't a message, just return the bubble
+                    if (!React || card.activity.type !== 'message') {
                         return originalBubble;
                     }
 
+                    // Render Bubble + Accordion safely
                     return React.createElement(
                         'div',
                         { style: { display: 'flex', flexDirection: 'column' } },
                         
-                        // 1. The Chat Bubble
                         originalBubble,
 
-                        // 2. The Accordion
                         React.createElement(
                             'details',
-                            { 
-                                style: { 
-                                    marginTop: '4px',
-                                    marginLeft: '10px',
-                                    fontSize: '11px', 
-                                    fontFamily: 'Consolas, monospace',
-                                    color: '#666',
-                                    maxWidth: '400px' // Prevent full width stretch
-                                } 
-                            },
+                            { style: { marginTop: '4px', marginLeft: '10px', fontSize: '11px', fontFamily: 'Consolas, monospace', color: '#666', maxWidth: '400px' } },
                             React.createElement(
                                 'summary', 
                                 { style: { cursor: 'pointer', outline: 'none' } }, 
@@ -247,17 +216,7 @@
                             ),
                             React.createElement(
                                 'pre',
-                                { 
-                                    style: { 
-                                        backgroundColor: '#fff', 
-                                        padding: '10px', 
-                                        border: '1px solid #ddd',
-                                        borderRadius: '5px',
-                                        overflowX: 'auto',
-                                        maxHeight: '300px',
-                                        marginTop: '5px'
-                                    } 
-                                },
+                                { style: { backgroundColor: '#fff', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', overflowX: 'auto', maxHeight: '300px', marginTop: '5px' } },
                                 JSON.stringify(card.activity, null, 2)
                             )
                         )
