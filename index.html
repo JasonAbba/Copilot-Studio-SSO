@@ -200,9 +200,12 @@
                         }
                     }
                 }
-                
-                console.log("🚨 Activity Logged:");
-                console.table(action.payload.activity);
+
+                // console all the activities to/from Copilot Agent
+                if (action.payload?.activity) {
+                    console.log("🚨 Activity Logged:");
+                    console.log(JSON.stringify(action.payload.activity, null, 2));
+                }
                 
                 return next(action);
             });
