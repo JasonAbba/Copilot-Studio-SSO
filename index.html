@@ -85,8 +85,8 @@
             auth: {
                 clientId: "be17ba3a-270e-4169-a3d6-a0787579b080", //Copilot-Canvas-App Client ID
                 authority: "https://login.microsoftonline.com/24917450-fe15-4414-92ed-94fa8ec1b938",
-                redirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/", // This is where the user will be redirected to after successful login
-                postLogoutRedirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/" // This is where the user will be redirected to after successful logout
+                redirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/", 
+                postLogoutRedirectUri: "https://jasonabba.github.io/Copilot-Studio-SSO/" 
             },
             cache: { cacheLocation: "sessionStorage" }
         },
@@ -115,8 +115,8 @@
             document.getElementById('user-info').innerText = `Hello, ${user.name}`;
             document.getElementById('btn-signout').style.display = 'block';
 
-            //Generate Initials - "Abba Jason Samuel" -> ["Abba", "Jason", "Samuel"] -> ["A", "J"] -> "AJ"
-            const userInitials = user.name ? user.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() : 'ME'; // Fallback if name is missing
+            //Generate Initials
+            const userInitials = user.name ? user.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() : 'ME'; 
 
             // Fetch Token
             const dlRes = await fetch(config.bot.tokenEndpoint);
@@ -130,31 +130,25 @@
 
             // --- AESTHETIC STYLE OPTIONS ---
             const styleOptions = {
-                // Backgrounds
-                backgroundColor: '#F3F2F1', // Light grey chat background
-                bubbleBackground: '#FFFFFF', // White bot bubbles
-                bubbleFromUserBackground: '#0078D4', // User blue bubbles
+                backgroundColor: '#F3F2F1', 
+                bubbleBackground: '#FFFFFF', 
+                bubbleFromUserBackground: '#0078D4', 
                 
-                // Text Colors
                 bubbleTextColor: '#000000',
                 bubbleFromUserTextColor: '#FFFFFF',
 
-                // Border Radius (Rounded corners)
                 bubbleBorderRadius: 18,
                 bubbleFromUserBorderRadius: 18,
                 
-                // Avatars
-                botAvatarInitials: 'CS', // Copilot Studio
+                botAvatarInitials: 'CS', 
                 userAvatarInitials: userInitials, 
                 botAvatarBackgroundColor: '#0078D4',
                 userAvatarBackgroundColor: '#201F1E',
                 
-                // Spacing & sizing
-                bubbleFromUserNuance: 'top', // Stacks user messages nicely
+                bubbleFromUserNuance: 'top', 
                 bubbleNuance: 'top',
                 paddingRegular: 10,
 
-                // Send Box Styling
                 hideUploadButton: true,
                 sendBoxBackground: '#FFFFFF',
                 sendBoxButtonColor: '#0078D4',
@@ -201,7 +195,7 @@
                     }
                 }
 
-                // console all the activities to/from Copilot Agent
+                // Console log activity
                 if (action.payload?.activity) {
                     console.log("🚨 Activity Logged:");
                     console.log(JSON.stringify(action.payload.activity, null, 2));
@@ -214,7 +208,63 @@
                 directLine: directLine,
                 store: store,
                 userID: user.localAccountId,
-                styleOptions: styleOptions
+                styleOptions: styleOptions,
+
+                // --- NEW MIDDLEWARE FOR DEBUG ACCORDION ---
+                activityMiddleware: () => next => card => children => {
+                    const originalBubble = next(card)(children);
+                    const React = window.WebChat.React;
+
+                    // Only add debug info to messages, not system events
+                    if (card.activity.type !== 'message') {
+                        return originalBubble;
+                    }
+
+                    return React.createElement(
+                        'div',
+                        { style: { display: 'flex', flexDirection: 'column' } },
+                        
+                        // 1. The Chat Bubble
+                        originalBubble,
+
+                        // 2. The Accordion
+                        React.createElement(
+                            'details',
+                            { 
+                                style: { 
+                                    marginTop: '4px',
+                                    marginLeft: '10px',
+                                    fontSize: '11px', 
+                                    fontFamily: 'Consolas, monospace',
+                                    color: '#666',
+                                    maxWidth: '400px' // Prevent full width stretch
+                                } 
+                            },
+                            React.createElement(
+                                'summary', 
+                                { style: { cursor: 'pointer', outline: 'none' } }, 
+                                '🔍 View Activity JSON'
+                            ),
+                            React.createElement(
+                                'pre',
+                                { 
+                                    style: { 
+                                        backgroundColor: '#fff', 
+                                        padding: '10px', 
+                                        border: '1px solid #ddd',
+                                        borderRadius: '5px',
+                                        overflowX: 'auto',
+                                        maxHeight: '300px',
+                                        marginTop: '5px'
+                                    } 
+                                },
+                                JSON.stringify(card.activity, null, 2)
+                            )
+                        )
+                    );
+                }
+                // --- END MIDDLEWARE ---
+
             }, document.getElementById('webchat'));
             
         } catch (err) {
