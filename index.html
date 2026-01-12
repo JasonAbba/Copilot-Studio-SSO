@@ -200,10 +200,12 @@
                         }
                     }
                 }
+                
+                console.log("🚨 Activity Logged:");
+                console.table(action.payload.activity);
+                
                 return next(action);
             });
-            console.log("🚨 Activity Logged:");
-            console.table(activity);
 
             window.WebChat.renderWebChat({
                 directLine: directLine,
