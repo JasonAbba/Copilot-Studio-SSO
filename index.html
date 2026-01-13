@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Enterprise Chat - Modern UI</title>
+    <title>Enterprise Chat - Robust</title>
     <script src="https://cdn.botframework.com/botframework-webchat/4.18.0/webchat.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
     <style>
@@ -49,9 +49,7 @@
             font-size: 14px;
             transition: all 0.2s ease;
         }
-        .btn-logout:hover { 
-            background: rgba(255, 255, 255, 0.3); 
-        }
+        .btn-logout:hover { background: rgba(255, 255, 255, 0.3); }
 
         #loader {
             display: flex;
@@ -119,12 +117,7 @@
 
             const directLine = window.WebChat.createDirectLine({ token });
 
-            // 2. SAFETY CHECK: Define React explicitly
-            const React = window.WebChat.React;
-            if (!React) {
-                console.error("⚠️ WebChat.React is undefined. The accordion debugger will not appear.");
-            }
-
+            // --- STYLE OPTIONS ---
             const styleOptions = {
                 backgroundColor: '#F3F2F1', 
                 bubbleBackground: '#FFFFFF', 
@@ -147,7 +140,10 @@
                 sendBoxHeight: 50
             };
 
-            const store = window.WebChat.createStore({}, ({ dispatch }) => next => async action => {
+            // --- REDUX STORE MIDDLEWARE ---
+            const store = window.WebChat.createStore({}, ({ dispatch }) => next => action => {
+                
+                // 1. Proactive Greeting
                 if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
                     dispatch({
                         type: 'DIRECT_LINE/POST_ACTIVITY',
@@ -156,67 +152,83 @@
                     });
                 }
 
+                // 2. SSO Token Logic
                 if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
                     const activity = action.payload.activity;
                     if (activity.attachments?.[0]?.contentType === 'application/vnd.microsoft.card.oauth') {
                         const content = activity.attachments[0].content;
                         if (content.tokenExchangeResource) {
-                            try {
-                                const tokenResult = await msalInstance.acquireTokenSilent({
-                                    scopes: [config.bot.scope],
-                                    account: user
-                                });
-                                directLine.postActivity({
-                                    type: 'invoke',
-                                    name: 'signin/tokenExchange',
-                                    value: {
-                                        id: content.tokenExchangeResource.id,
-                                        connectionName: content.connectionName,
-                                        token: tokenResult.accessToken
-                                    },
-                                    from: { id: user.localAccountId, name: user.name, role: "user" }
-                                }).subscribe();
-                                return; 
-                            } catch (e) { console.error(e); }
+                            (async () => {
+                                try {
+                                    const tokenResult = await msalInstance.acquireTokenSilent({
+                                        scopes: [config.bot.scope],
+                                        account: user
+                                    });
+                                    directLine.postActivity({
+                                        type: 'invoke',
+                                        name: 'signin/tokenExchange',
+                                        value: {
+                                            id: content.tokenExchangeResource.id,
+                                            connectionName: content.connectionName,
+                                            token: tokenResult.accessToken
+                                        },
+                                        from: { id: user.localAccountId, name: user.name, role: "user" }
+                                    }).subscribe();
+                                } catch (e) { console.error("SSO Error:", e); }
+                            })();
                         }
                     }
                 }
                 return next(action);
             });
 
+            // --- RENDER WEB CHAT ---
             window.WebChat.renderWebChat({
                 directLine: directLine,
                 store: store,
                 userID: user.localAccountId,
                 styleOptions: styleOptions,
 
-                // --- 3. SAFER DEBUG MIDDLEWARE ---
+                // --- CRASH-PROOF ACTIVITY MIDDLEWARE ---
                 activityMiddleware: () => next => card => children => {
-                    const originalBubble = next(card)(children);
+                    // 1. Fetch the default renderer for this card
+                    const Renderer = next(card);
 
-                    // If React is missing or this isn't a message, just return the bubble
+                    // 2. SECURITY CHECK: If WebChat didn't return a function (it returned undefined or a component directly), 
+                    // simply return it. Calling it as Renderer(children) would crash.
+                    if (typeof Renderer !== 'function') {
+                        return Renderer;
+                    }
+
+                    // 3. Render the standard chat bubble
+                    const originalBubble = Renderer(children);
+
+                    // 4. Access React Safely
+                    const React = window.WebChat.React;
+
+                    // 5. If React is missing (CDN issue) OR this isn't a user message, just return the bubble.
                     if (!React || card.activity.type !== 'message') {
                         return originalBubble;
                     }
 
-                    // Render Bubble + Accordion safely
+                    // 6. If safe, wrap in the Accordion
                     return React.createElement(
                         'div',
-                        { style: { display: 'flex', flexDirection: 'column' } },
+                        { style: { display: 'flex', flexDirection: 'column', marginBottom: '10px' } },
                         
                         originalBubble,
 
                         React.createElement(
                             'details',
-                            { style: { marginTop: '4px', marginLeft: '10px', fontSize: '11px', fontFamily: 'Consolas, monospace', color: '#666', maxWidth: '400px' } },
+                            { style: { marginTop: '4px', marginLeft: '10px', fontSize: '11px', fontFamily: 'Consolas, monospace', color: '#666', maxWidth: '85%' } },
                             React.createElement(
                                 'summary', 
-                                { style: { cursor: 'pointer', outline: 'none' } }, 
-                                '🔍 View Activity JSON'
+                                { style: { cursor: 'pointer', outline: 'none', userSelect: 'none' } }, 
+                                '🔍 View JSON'
                             ),
                             React.createElement(
                                 'pre',
-                                { style: { backgroundColor: '#fff', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', overflowX: 'auto', maxHeight: '300px', marginTop: '5px' } },
+                                { style: { backgroundColor: '#f8f9fa', padding: '10px', border: '1px solid #dee2e6', borderRadius: '4px', overflowX: 'auto', marginTop: '5px' } },
                                 JSON.stringify(card.activity, null, 2)
                             )
                         )
